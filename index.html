@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instagram Mass Report – Auto Login</title>
+<style>
+  /* (styles same as previous – omitted for brevity, include full CSS) */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; font-weight: 300; color: #fff; background: linear-gradient(135deg, #0f0c29 0%, #302b63 40%, #24243e 100%); background-attachment: fixed; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 20px; min-height: 100vh; }
+  .glass-panel { background: rgba(255,255,255,0.08); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.15); border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.37); padding: 24px; width: 100%; max-width: 680px; }
+  .credentials-bar, .login-panel { margin-bottom: 20px; }
+  .cred-group { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+  .cred-group label { font-size: 11px; font-weight: 400; opacity: 0.7; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .cred-group input { padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #fff; font-size: 13px; outline: none; }
+  .cred-group input:focus { border-color: rgba(168,140,209,0.8); box-shadow: 0 0 0 3px rgba(168,140,209,0.15); }
+  .login-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .btn { padding: 12px 28px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 14px; transition: 0.3s; text-transform: uppercase; }
+  .btn-login { background: rgba(161,140,209,0.25); }
+  .btn-start { background: rgba(161,140,209,0.25); }
+  .btn-stop { background: rgba(255,100,100,0.2); }
+  .tab-nav { display: flex; }
+  .tab-btn { flex: 1; padding: 14px 24px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.55); cursor: pointer; }
+  .tab-btn.active { background: rgba(255,255,255,0.12); color: #fff; border-bottom: 2px solid #a18cd1; }
+  .tab-content { display: none; }
+  .tab-content.visible { display: block; }
+  .content-wrapper { border-radius: 0 0 24px 24px; background: rgba(255,255,255,0.08); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.15); padding: 24px; }
+  .form-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .form-row label { font-size: 13px; opacity: 0.8; align-self: center; }
+  .form-row input { flex: 1; min-width: 140px; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #fff; }
+  .progress-container { margin-bottom: 16px; }
+  .progress-track { height: 6px; border-radius: 10px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 10px; width: 0%; background: linear-gradient(90deg, #a18cd1, #fbc2eb); background-size: 200% 100%; animation: shimmer 2s infinite; transition: width 0.35s; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .log-container { height: 240px; overflow-y: auto; border-radius: 16px; background: rgba(0,0,0,0.3); padding: 12px; font-family: monospace; font-size: 11px; }
+  .log-entry.success { color: #7ee8a0; } .log-entry.error { color: #f87c7c; } .log-entry.info { color: #a0c4ff; }
+</style>
+</head>
+<body>
+  <!-- Proxy is automatic via /api/proxy, no need for manual input -->
+  <div class="glass-panel login-panel">
+    <div class="login-form">
+      <div class="cred-group"><label>Instagram Username</label><input type="text" id="loginUsername" placeholder="your_username" autocomplete="off"></div>
+      <div class="cred-group"><label>Password</label><input type="password" id="loginPassword" placeholder="your_password" autocomplete="off"></div>
+      <button class="btn btn-login" id="loginBtn">▶ Log In & Extract Cookies</button>
+    </div>
+    <div id="loginStatus" style="margin-top:8px;opacity:0.8;"></div>
+    <!-- Auto-filled tokens will appear here after login -->
+    <div class="credentials-bar" style="margin-top:12px">
+      <div class="cred-group"><label>Session ID (auto)</label><input type="text" id="sessionIdInput" readonly></div>
+      <div class="cred-group"><label>CSRF Token (auto)</label><input type="text" id="csrfTokenInput" readonly></div>
+    </div>
+  </div>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="ban" id="tabBanBtn">Ban Mass Report</button>
+    <button class="tab-btn" data-tab="unban" id="tabUnbanBtn">Unban Mass Report</button>
+  </nav>
+
+  <!-- Ban tab -->
+  <div class="content-wrapper tab-content visible" id="tab-ban">
+    <div class="form-row"><label>Target Username</label><input type="text" id="banUsername" placeholder="e.g. tiktok"></div>
+    <div class="form-row"><label>Report Count</label><input type="number" id="banCount" value="10" min="1" max="1000"></div>
+    <div class="btn-row"><button class="btn btn-start" id="banStartBtn">▶ Start</button><button class="btn btn-stop" id="banStopBtn" disabled>■ Stop</button></div>
+    <div class="progress-container"><div class="progress-label"><span>Progress</span><span id="banProgressText">0 / 0</span></div><div class="progress-track"><div class="progress-fill" id="banProgressFill"></div></div></div>
+    <div class="log-container" id="banLogContainer"></div>
+  </div>
+
+  <!-- Unban tab -->
+  <div class="content-wrapper tab-content" id="tab-unban">
+    <div class="form-row"><label>Target Username</label><input type="text" id="unbanUsername" placeholder="e.g. tiktok"></div>
+    <div class="form-row"><label>Report Count</label><input type="number" id="unbanCount" value="10" min="1" max="1000"></div>
+    <div class="btn-row"><button class="btn btn-start" id="unbanStartBtn">▶ Start</button><button class="btn btn-stop" id="unbanStopBtn" disabled>■ Stop</button></div>
+    <div class="progress-container"><div class="progress-label"><span>Progress</span><span id="unbanProgressText">0 / 0</span></div><div class="progress-track"><div class="progress-fill" id="unbanProgressFill"></div></div></div>
+    <div class="log-container" id="unbanLogContainer"></div>
+  </div>
+
+<script>
+// =============================================================================
+// Automatic cookie extraction via Vercel serverless proxy.
+// All Instagram API calls go through /api/proxy?url=<encoded_url>
+// to avoid CORS and allow cookies to be captured.
+// =============================================================================
+
+const PROXY_BASE = '/api/proxy?url=';
+const IG_APP_ID = '1217981644879628';
+const IG_USER_AGENT = 'Instagram 219.0.0.12.117 Android (28/9; 420dpi; 1080x1920; samsung; SM-G960F; starlte; exynos9810; en_US; 239491810)';
+
+function generateGuid(){ const hex='0123456789abcdef'; let u=''; for(let i=0;i<36;i++){ if(i===8||i===13||i===18||i===23){u+='-';continue;} if(i===14){u+='4';continue;} if(i===19){u+=hex[(Math.random()*4|0)+8];continue;} u+=hex[Math.random()*16|0];} return u; }
+function generateDeviceId(){ const hex='0123456789abcdef'; let id=''; for(let i=0;i<16;i++) id+=hex[Math.random()*16|0]; return id; }
+
+// ---------- DOM elements ----------
+const loginUsername = document.getElementById('loginUsername');
+const loginPassword = document.getElementById('loginPassword');
+const loginBtn = document.getElementById('loginBtn');
+const loginStatus = document.getElementById('loginStatus');
+const sessionOutput = document.getElementById('sessionIdInput');
+const csrfOutput = document.getElementById('csrfTokenInput');
+
+const tabBanBtn = document.getElementById('tabBanBtn');
+const tabUnbanBtn = document.getElementById('tabUnbanBtn');
+const banTab = document.getElementById('tab-ban');
+const unbanTab = document.getElementById('tab-unban');
+const banUsername = document.getElementById('banUsername');
+const banCount = document.getElementById('banCount');
+const banStartBtn = document.getElementById('banStartBtn');
+const banStopBtn = document.getElementById('banStopBtn');
+const banProgressFill = document.getElementById('banProgressFill');
+const banProgressText = document.getElementById('banProgressText');
+const banLogContainer = document.getElementById('banLogContainer');
+const unbanUsername = document.getElementById('unbanUsername');
+const unbanCount = document.getElementById('unbanCount');
+const unbanStartBtn = document.getElementById('unbanStartBtn');
+const unbanStopBtn = document.getElementById('unbanStopBtn');
+const unbanProgressFill = document.getElementById('unbanProgressFill');
+const unbanProgressText = document.getElementById('unbanProgressText');
+const unbanLogContainer = document.getElementById('unbanLogContainer');
+
+let activeRun = { mode: null, controller: null, count: 0, completed: 0 };
+let globalSessionId = '';
+let globalCsrfToken = '';
+
+// ---------- Tab handling ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    if(activeRun.mode) return;
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('visible'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('visible');
+  });
+});
+
+// ---------- Proxy fetch helper ----------
+async function proxyFetch(igUrl, options = {}) {
+  // igUrl: full Instagram URL e.g. https://i.instagram.com/api/v1/...
+  const proxyUrl = PROXY_BASE + encodeURIComponent(igUrl);
+  const fetchOptions = {
+    method: options.method || 'GET',
+    headers: options.headers || {},
+  };
+  if (options.body) fetchOptions.body = options.body;
+  // The proxy will forward credentials; we don't send cookies manually.
+  // We pass the sessionid/csrftoken via custom headers X-IG-Sessionid / X-IG-Csrftoken to the proxy.
+  const headers = fetchOptions.headers;
+  if (globalSessionId) headers['X-IG-Sessionid'] = globalSessionId;
+  if (globalCsrfToken) headers['X-IG-Csrftoken'] = globalCsrfToken;
+  // Also pass standard IG headers
+  headers['X-IG-App-Id'] = IG_APP_ID;
+  headers['User-Agent'] = IG_USER_AGENT;
+  headers['x-requested-with'] = 'XMLHttpRequest';
+  // The proxy will strip these X- headers and forward the real cookies.
+  const resp = await fetch(proxyUrl, fetchOptions);
+  return resp;
+}
+
+// ---------- Login and extract cookies ----------
+async function performLogin() {
+  const username = loginUsername.value.trim();
+  const password = loginPassword.value.trim();
+  if(!username||!password) { loginStatus.textContent='❌ Enter username and password'; return; }
+  loginBtn.disabled = true;
+  loginStatus.textContent='⏳ Logging in...';
+  const loginUrl = 'https://i.instagram.com/api/v1/accounts/login/';
+  const deviceId = generateDeviceId();
+  const guid = generateGuid();
+  const body = new URLSearchParams();
+  body.append('username', username);
+  body.append('password', password);
+  body.append('device_id', deviceId);
+  body.append('guid', guid);
+  body.append('login_attempt_count', '0');
+  body.append('_csrftoken', 'missing');
+
+  try {
+    const resp = await proxyFetch(loginUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    const data = await resp.json();
+    // The proxy injects a special header X-IG-Cookies with the extracted Set-Cookie values.
+    const extractedCookies = resp.headers.get('X-IG-Cookies');
+    if (extractedCookies) {
+      const cookies = parseCookies(extractedCookies);
+      if (cookies.sessionid) globalSessionId = cookies.sessionid;
+      if (cookies.csrftoken) globalCsrfToken = cookies.csrftoken;
+      sessionOutput.value = globalSessionId || 'Not captured';
+      csrfOutput.value = globalCsrfToken || 'Not captured';
+    }
+    if (data.status === 'ok' && data.logged_in_user) {
+      loginStatus.textContent = '✅ Login successful. Cookies extracted.';
+      // If csrftoken not in Set-Cookie, try response body
+      if (!globalCsrfToken && (data.csrftoken || data.csrf_token)) {
+        globalCsrfToken = data.csrftoken || data.csrf_token;
+        csrfOutput.value = globalCsrfToken;
+      }
+      // Enable tabs
+      tabBanBtn.disabled = false; tabUnbanBtn.disabled = false;
+    } else {
+      loginStatus.textContent = '❌ Login failed: ' + (data.message || JSON.stringify(data));
+    }
+  } catch(e) {
+    loginStatus.textContent = '❌ Network error: ' + e.message;
+  }
+  loginBtn.disabled = false;
+}
+loginBtn.addEventListener('click', performLogin);
+
+function parseCookies(cookieString) {
+  const map = {};
+  cookieString.split(';').forEach(c => {
+    const [name, ...rest] = c.split('=');
+    if (name && rest.length) map[name.trim()] = rest.join('=').trim();
+  });
+  return map;
+}
+
+// ---------- Get user ID (with proxy) ----------
+async function getUserId(username) {
+  const url1 = 'https://i.instagram.com/api/v1/users/' + encodeURIComponent(username) + '/usernameinfo/';
+  const resp = await proxyFetch(url1);
+  if (resp.ok) {
+    const data = await resp.json();
+    if (data.user && data.user.pk) return data.user.pk;
+  }
+  const url2 = 'https://i.instagram.com/api/v1/users/web_profile_info/?username=' + encodeURIComponent(username);
+  const resp2 = await proxyFetch(url2);
+  if (!resp2.ok) throw new Error('User lookup failed');
+  const data2 = await resp2.json();
+  if (data2.data && data2.data.user && data2.data.user.id) return data2.data.user.id;
+  throw new Error('Could not resolve user');
+}
+
+// ---------- Report loops ----------
+async function runBanLoop(username, count, controller) {
+  const log = banLogContainer; addLogEntry(log,'Ban mode started for @'+username);
+  let userId; try { userId = await getUserId(username); addLogEntry(log,'User ID: '+userId,'success'); } catch(e) { addLogEntry(log,'Error: '+e.message,'error'); return; }
+  const endpoint = 'https://i.instagram.com/api/v1/users/'+userId+'/flag/';
+  let completed = 0;
+  for(let i=0;i<count;i++) {
+    if(controller.signal.aborted) break;
+    const delayMs = Math.floor(Math.random()*10001)+10000;
+    addLogEntry(log,'Wait '+ (delayMs/1000).toFixed(1)+'s...');
+    await new Promise(r=>setTimeout(r,delayMs));
+    if(controller.signal.aborted) break;
+    const reasonIds=[1,2,3,4,5,6,7,8,9];
+    const params = new URLSearchParams();
+    params.append('reason_id', reasonIds[Math.floor(Math.random()*reasonIds.length)]);
+    params.append('source_name','profile');
+    params.append('frx_context','null');
+    params.append('guid',generateGuid());
+    params.append('device_id',generateDeviceId());
+    try {
+      const resp = await proxyFetch(endpoint, { method:'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body:params.toString() });
+      completed++;
+      if(resp.ok) addLogEntry(log,'Report #'+(i+1)+' ✓ HTTP '+resp.status,'success');
+      else addLogEntry(log,'Report #'+(i+1)+' ✗ HTTP '+resp.status,'error');
+    } catch(e) {
+      if(e.name==='AbortError') break;
+      completed++;
+      addLogEntry(log,'Report #'+(i+1)+' ✗ '+e.message,'error');
+    }
+    updateProgressUI(count,completed,'ban');
+    if(controller.signal.aborted) break;
+  }
+  addLogEntry(log,'Ban done. '+completed+'/'+count);
+}
+async function runUnbanLoop(username, count, controller) {
+  const log = unbanLogContainer; addLogEntry(log,'Unban mode for @'+username);
+  let userId; try { userId = await getUserId(username); addLogEntry(log,'User ID: '+userId,'success'); } catch(e) { addLogEntry(log,'Error: '+e.message,'error'); return; }
+  const endpoint = 'https://i.instagram.com/api/v1/users/'+userId+'/report/';
+  let completed=0;
+  for(let i=0;i<count;i++) {
+    if(controller.signal.aborted) break;
+    const delayMs = Math.floor(Math.random()*10001)+10000;
+    addLogEntry(log,'Wait '+ (delayMs/1000).toFixed(1)+'s...');
+    await new Promise(r=>setTimeout(r,delayMs));
+    if(controller.signal.aborted) break;
+    const params = new URLSearchParams();
+    params.append('flag_content','ban_appeal');
+    params.append('reason_id','23');
+    params.append('source_name','profile');
+    params.append('guid',generateGuid());
+    params.append('device_id',generateDeviceId());
+    try {
+      const resp = await proxyFetch(endpoint, { method:'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body:params.toString() });
+      completed++;
+      if(resp.ok) addLogEntry(log,'Appeal #'+(i+1)+' ✓ HTTP '+resp.status,'success');
+      else addLogEntry(log,'Appeal #'+(i+1)+' ✗ HTTP '+resp.status,'error');
+    } catch(e) {
+      if(e.name==='AbortError') break;
+      completed++;
+      addLogEntry(log,'Appeal #'+(i+1)+' ✗ '+e.message,'error');
+    }
+    updateProgressUI(count,completed,'unban');
+    if(controller.signal.aborted) break;
+  }
+  addLogEntry(log,'Unban done. '+completed+'/'+count);
+}
+
+function addLogEntry(c,m,t){ const d=document.createElement('div'); d.className='log-entry '+(t||'info'); const now=new Date(); d.innerHTML='<span class="log-timestamp">['+now.toTimeString().slice(0,8)+']</span>'+m; c.appendChild(d); c.scrollTop=c.scrollHeight; }
+function updateProgressUI(total,completed,mode){
+  const pct=total?Math.round(completed/total*100):0;
+  if(mode==='ban'){ banProgressFill.style.width=pct+'%'; banProgressText.textContent=completed+' / '+total+' ('+pct+'%)'; }
+  else{ unbanProgressFill.style.width=pct+'%'; unbanProgressText.textContent=completed+' / '+total+' ('+pct+'%)'; }
+}
+
+async function startRun(mode){
+  if(activeRun.mode) return;
+  if(!globalSessionId || !globalCsrfToken) { addLogEntry(banLogContainer,'Login first.','error'); return; }
+  const username = mode==='ban' ? banUsername.value.trim() : unbanUsername.value.trim();
+  const count = parseInt(mode==='ban' ? banCount.value : unbanCount.value,10);
+  if(!username) { addLogEntry(mode==='ban'?banLogContainer:unbanLogContainer,'Target username required.','error'); return; }
+  if(isNaN(count)||count<1||count>1000) { addLogEntry(mode==='ban'?banLogContainer:unbanLogContainer,'Report count 1-1000.','error'); return; }
+  const controller = new AbortController();
+  activeRun = { mode, controller, count, completed:0 };
+  if(mode==='ban'){ banStartBtn.disabled=true; banStopBtn.disabled=false; banLogContainer.innerHTML=''; banProgressFill.style.width='0%'; banProgressText.textContent='0 / '+count; }
+  else{ unbanStartBtn.disabled=true; unbanStopBtn.disabled=false; unbanLogContainer.innerHTML=''; unbanProgressFill.style.width='0%'; unbanProgressText.textContent='0 / '+count; }
+  try {
+    if(mode==='ban') await runBanLoop(username,count,controller);
+    else await runUnbanLoop(username,count,controller);
+  } catch(e){ addLogEntry(mode==='ban'?banLogContainer:unbanLogContainer,'Fatal error: '+e.message,'error'); }
+  if(mode==='ban'){ banStartBtn.disabled=false; banStopBtn.disabled=true; } else{ unbanStartBtn.disabled=false; unbanStopBtn.disabled=true; }
+  activeRun = { mode:null, controller:null, count:0, completed:0 };
+}
+function stopRun(){ if(activeRun.controller) activeRun.controller.abort(); }
+
+banStartBtn.addEventListener('click', ()=>startRun('ban'));
+banStopBtn.addEventListener('click', stopRun);
+unbanStartBtn.addEventListener('click', ()=>startRun('unban'));
+unbanStopBtn.addEventListener('click', stopRun);
+
+// disable tabs initially
+tabBanBtn.disabled = true; tabUnbanBtn.disabled = true;
+</script>
+</body>
+</html>
